@@ -1,0 +1,995 @@
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - %
+%                                                                     %
+%                 LaTeX template for simple article                   %
+%                                                                     %
+% - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - %
+\documentclass[10pt,a4paper]{article}
+
+% Bibliography
+\usepackage[round]{natbib}
+
+% Writing
+\usepackage[english,frenchb]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{soul}
+\usepackage{extsizes}
+
+% Mathematics
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{bm}
+
+% Images
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{overpic}
+\usepackage{pgf,tikz}
+\usepackage{contour}
+
+% Editing
+\usepackage{multicol}
+\usepackage[top = 20mm,
+          width = 0.80\paperwidth,
+      columnsep = 15pt]{geometry}
+\usepackage{caption}
+\usepackage{floatrow}
+\usepackage{xcolor}
+
+% Metadata
+\usepackage[pdftex,
+pdfauthor   = {Florian Millet},
+pdftitle    = {Article},
+pdfsubject  = {},
+pdfproducer = {Latex with hyperref},
+pdfcreator  = {pdflatex}]{hyperref}
+
+% Other options
+\renewcommand{\thepage}{}
+\numberwithin{equation}{section}
+\setcounter{tocdepth}{2}
+\def\bibfont{\footnotesize}
+\setlength{\bibsep}{2pt plus .3ex}
+\captionsetup{font=small,labelfont=sc,labelfont=bf}
+\contourlength{.5pt}
+\floatsetup[table]{capposition=top}
+\renewcommand{\arraystretch}{1.1}
+\setlength\parindent{20pt}
+\hypersetup{colorlinks,
+            citecolor={blue!80!black}}
+\renewcommand{\baselinestretch}{2.0}
+\definecolor{myblue}{RGB}{000,255,255}
+\definecolor{mygreen}{RGB}{000,155,000}
+\DeclareRobustCommand{\rq}[1]{{\sethlcolor{myblue}\hl{#1}}}
+\DeclareRobustCommand{\new}[1]{{\color{mygreen}\textbf{#1}}}
+\DeclareRobustCommand{\old}[1]{{\color{red}\setstcolor{red}\st{#1}}}
+
+% Information
+\title{Multi-Mode 3D Kirchhoff Migration of Receiver Functions at Continental Scale}
+\author{\textit{Florian Millet}, Thomas Bodin, Stéphane Rondenay}
+\date{\today}
+
+
+
+%---------------------------------------------------------------------%
+%                        Document starts here                         %
+%---------------------------------------------------------------------%
+\begin{document}
+\selectlanguage{english}
+
+%-------
+% Title 
+%-------
+\renewcommand{\thepage}{\arabic{page}}
+\setcounter{page}{1}
+
+\maketitle
+
+%\vspace{-10mm}
+\begin{center}\rule{4cm}{.55pt}\end{center}
+\vspace{-2mm}
+
+%---------
+% Section
+%---------
+\section*{Abstract}
+
+Receiver Function (RF) studies are a widely used tool to recover sharp structures in the Earth such as the Moho or the mantle transition zone.
+However, standard procedures such as Common Conversion Point (CCP) stacking rely on the assumption that the underlying discontinuities are horizontal and more elaborated techniques such as Reverse-Time Migration (RTM) or the Generalized Radon Transform (GRT) are computationally expensive, and hence are usually limited to 2D structure analysis.
+Another option is to apply acoustic reflection Kirchhoff migration to the case of transmission scattering in passive seismology (i.e. receiver functions).
+In this paper, we expand the work done by \cite{cheng_gji_16}, and develop an efficient fully 3D Kirchhoff migration of receiver functions that accounts for free surface multiples.
+We use the Eikonal solver FM3D to compute the travel times for all scattered phases and migrate them to depth.
+We use three component RFs and correct their amplitudes and polarities using 3D scattering patterns to get coherent images and exploit all distance and back-azimuth ranges.
+We explicitly describe the imaging principles and test three different stacking methods to extract the coherent information from the forward and back-scattered 3D migrated images.
+We show that our imaging principle can recover scattering structures with minimal artifacts.
+This is tested both in synthetic cases, using the Raysum package, and in a real case study, using data from the MEDUSA experiment in the Hellenic subduction zone.
+For the later, we show that our images are similar to the ones obtained with a GRT migration for a comparable run time.
+
+%\clearpage
+\vspace{10mm}
+%\begin{multicols}{2}
+
+%---------
+% Section
+%---------
+\section{Introduction}
+
+Scattered signals in the coda of main teleseismic phases have been used to map discontinuities at various scales in the Earth.
+Receiver Function (RF) analysis extracts structural information from body-wave seismograms by removing the source component to retrieve the P-to-S and S-to-P converted waves (\cite{lang_jgr_79}, \cite{bost_gji_99}, \cite{park_bssa_00}). 
+
+There has been a growing interest to exploit the scattered wavefield at larger scales as it contains information about sharp structures that standard travel-time or surface wave tomography cannot resolve.
+These sharp scatterers are often linked to variations in composition, mineralogical or water content.
+Exploiting this data in the form of RF sheds light on open research topics such as the dehydration of slabs (\cite{tauz_epsl_17}), deep phase transitions in secondary minerals (\cite{cott_jgr_16}) and the water content of the mantle transition zone (\cite{zhen_sci_07}).
+
+RF analysis is based on the separation of the direct P-wave on the vertical component and the P-to-S scattered S-waves on the horizontal components of seismograms for steep teleseismic arrivals (\cite{phin_jgr_64}, \cite{lang_jgr_79}).
+In the case of first order forward P-to-S scattering at a horizontal interface, the scattered energy corresponds to an SV wave that is mostly recorded on the radial component of the seismograms.
+The data is selected from 30$^{\circ}$ to 90$^{\circ}$ of epicentral distance to avoid triplications from the mantle transition zone and core phases.
+The simplest way to exploit this data is to deconvolve the horizontal components by the vertical component.
+This assumes that the signal on the vertical component corresponds to the P-wave and that it represents the source time function.
+This deconvolution removes the complexity associated with the source time function from the S-waves on the horizontal components, and thus produces a waveform that can be interpreted in terms of scattering structure.
+More evolved deconvolution methods estimate source and noise functions on three components and allow to get multi-component RFs (\cite{chen_gji_10}).
+
+To interpret this data, Common Conversion Point (CCP) stacking methods (\cite{tess_gpro_88}, \cite{duek_jgr_97}) are a useful tool to get a first order image of the structure in the crust and upper mantle below an array of seismic stations.
+%\rq{More explanations.}
+By using a reference 1D velocity model and accounting for lateral move-out, these methods allow to locate stacked scattering potential back at depth.
+Many of these imaging methods only take the radial component of the RF into account when performing the imaging as it is faster and easier to interpret.
+\cite{tone_epsl_08} showed that the transverse component can also provide information about dipping reflectors.
+However, the polarity of S-waves in the transverse component varies with back-azimuth, and caution must be taken when staking.
+%\rq{BEFORE (1): "any incoming slowness and back-azimuth".}
+This usually means that authors restrain their datasets to convenient back-azimuth directions where the polarities are coherent.
+These methods have been applied to large datasets such as USArray in North America (\cite{leva_ggg_12}), J-array/Hi-net in Japan (\cite{yama_eps_03}) and CNDSN in China (\cite{chen_jgr_10}).
+
+CCP methods rely on the fundamental assumption that the imaged structures are horizontal, which allows for fast move-out corrections and stacking.
+This assumption is clearly not valid in many geological settings such as subduction zones and orogens for instance.
+Some approaches, such as the one-way wave equation migration (\cite{chen_jgr_05}), include 3D filtering to effectively take lateral heterogeneities into account.
+More complex methods such as Reverse Time Migration (RTM, \cite{burd_gji_13}) and Generalized Radon Transform (GRT, \cite{bost_jgr_01}) give a more detailed view of the 2D Earth.
+To address this issue, RTM methods rely on an inversion that requires the numerical computation of full waveforms for every source-receiver pair in a complex reference velocity model.
+GRT migrations include amplitude-sensitive weights that recover 2D or 3D velocity anomalies with minimal prior information.
+These approaches use all three components of the RF because they treat the full wavefield.
+They are more accurate but at the same time computationally expensive (\cite{rond_sgeo_09}) and require higher data coverage than CCP, and are therefore usually limited to local scale applications on dense linear arrays.
+Because a large variety of geological settings can be well approximated as 2D structures, this is, in many cases, enough to provide precious information about the geometry of the imaged structures (\cite{pear_jgr_12}).
+These methods have been applied in complex tectonic settings such as the Tibetan plateau (\cite{shan_gji_17}) or Cascadia subduction zone (\cite{rond_jgr_01}, \cite{aber_geol_09}).
+
+Until the last decade, the cost associated with 3D migration was too prohibitive to develop fully 3D imaging methods for scattered body waves.
+In recent years however, the use of new fast computational tools gave rise to a new generation of methods to look at laterally varying structures.
+Fully 3D P-wave coda waveform inversion by e.g. \cite{fred_gji_04} has been implemented and is a promising tool for local to regional studies, but remains computationally expensive.
+Recently, 2D and 3D CCP approaches (\cite{tauz_epsl_16}, \cite{rond_srl_17}) have been devised to image laterally varying media and have been successfully applied to multiple regions in North America.
+An extensive review of recent scattered body waves imaging techniques can be found in \cite{rond_sgeo_09}.
+
+Recently, \cite{pavl_cg_11} extended the GRT imaging principle to work in a 3D reference frame.
+The authors describe a migration method that allows to take advantage of the smoothness of the global tomographic models to speed-up computations.
+They use a plane wave approximation and perform the ray-tracing in a reference radially symmetric 1D Earth model.
+This approach is certainly valid for looking at the mantle transition zone, but can fall short in regions where strong lateral variations have large effects, such as subduction zones or highly anisotropic regions.
+\cite{wang_jgr_16} showed that this approach works with smoothly varying discontinuities, as long as the general behavior stays horizontal.
+
+\cite{cheng_gji_16} took another approach to the 3D migration problem and devised an acoustic a migration method based on the Kirchhoff imaging principle.
+This is a well established method in exploration geophysics (\cite{clae_book_85}).
+It has been adapted for use with teleseismic data in the past decades (\cite{rybe_gji_00}), and is the basis for the Regularized Kirchhoff migration (\cite{wils_jgr_05}) and the GRT migrations (\cite{bost_jgr_01}).
+In the data space, teleseismic Kirchhoff imaging stacks the data along diffraction hyperbolae corresponding to an ensemble of arrivals consistent with a scattering point.
+By stacking over the diffraction hyperbolae for each grid point, one can recover an image of the underlying structure under a receiver array.
+In the depth domain, this comes down to map a given arrival to an ensemble of grid points that predict that arrival time, i.e. a migration isochron.
+By migrating all the waveforms along the isochrons, the structure can be recovered.
+One of the drawbacks of this method however is that the data coverage needs to be dense enough for the migration isochrons to stack up constructively.
+
+What makes this method attractive is that only the travel times from the scattered phases need to be estimated as opposed to the full wavefield required in the other methods (RTM, GRT).
+The advantage is that the travel times can be quickly computed using the Eikonal equation.
+We compute them using the fast marching approach with the FM3D software package developed by \cite{deko_gji_06}.
+\cite{cheng_gji_16}, \cite{cheng_grl_17} showed that a fully 3D Kirchhoff prestack migration is computationally tractable.
+Their method was tested using 2.5D synthetic data generated with Raysum (\cite{fred_gji_00}) as well as data from the Cascadia93, Mendocino and USArray experiments.
+A similar method based on sensitivity kernels for P-to-S and S-to-P conversions has been devised by \cite{hans_ggg_17} and tested using 2D synthetics obtained with Specfem2D (\cite{trom_ccp_08}).
+Both methods have the same order of computational cost as 2D GRT but can image laterally varying structures such as subducting slabs given a dense coverage of the region of interest.
+
+Here we propose to extend the work by \cite{cheng_gji_16}, about Kirchhoff prestack depth migration of teleseimic receiver functions.
+One of the problems that was highlighted in this work is the presence of artifacts in the final image due to free surface multiples.
+These spurious signals might be interpreted as direct P-to-S conversions at the Lithosphere - Asthenosphere Boundary (LAB).
+In order to eliminate this problem, we migrate the data a first time assuming that the arrivals correspond to a direct P-to-S conversion, and a second time assuming the arrivals correspond to free surface multiples back-scattering.
+The FM3D software that we use computes the travel-times for any given reflected and transmitted phases combination.
+It uses a multi-stage approach gives us the travel-time fields for all the scattered phases, including the free surface multiples, with only one computation.
+This makes this approach computationally viable.
+
+Once the travel times are computed for all the scattered phases, one needs to take care of the polarity of the migrated waveforms for non-horizontal structures (\cite{tone_epsl_08}, \cite{cheng_gji_16}).
+The polarities and amplitudes are corrected using 3D scattering patterns as found in \cite{beyl_wamo_90}.
+The scattering patterns can be seen as simulating the physics of elastic wave propagation without having to compute expensive full waveforms.
+Here we only describe the method for use with the P-to-S RF, but one could devise a similar method for use with S-to-P RF.
+Similar to approaches by \cite{rond_sgeo_09}, we first get one image per mode, so four images in total.
+We test three stacking techniques to extract the coherent information between the forward and back-scattered migrated images to get the final migrated result.
+
+In this work, we derive this new imaging principle and discuss its ability to resolve complex 2D and 3D structures.
+After describing in detail the method in Section 2, we test it in Section 3 by conducting a series of synthetic tests using the Raysum software (\cite{fred_gji_00}) in both artificially challenging and realistic scenarios.
+We show that a typical subduction zone structure can be retrieved.
+Finally, we test our method on a field dataset from Greece in Section 4 (\cite{pear_jgr_12}).
+
+%---------
+% Section
+%---------
+\section{Methodology}
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Three component Receiver Functions}
+
+The radial, transverse and vertical components of seismograms and RFs record different yet coherent responses to discontinuities in the Earth, and therefore provide complementary information about the structure of the Earth (\cite{tone_epsl_08}).
+%\rq{More explanations.}
+In our case, we know that the P-to-S conversions are recorded almost solely on the radial component for a purely horizontal interface.
+However, for dipping interfaces, this energy is partitioned between the radial and transverse horizontal components.
+The P-to-P and S-to-P scattering is recorded on the vertical component.
+%The S-to-S scattering 
+Moreover, because teleseismic arrivals are nerver truly vertical, some of the P-to-S energy is recorded on the vertical component and some of the P-to-P and S-to-P is recorded on the horizontal components.
+These effects are even stronger in the case of large volumetric velocity heterogeneities.
+In this study, we use three component teleseismic RFs as we aim to retrieve all the information we can from dipping interfaces and lateral variations in elastic properties.
+
+For the synthetic cases, we directly use the waveforms obtained with the Raysum calculations as they already correspond to Gaussian peaks.
+For the field data, we use a deconvolution method similar to the one described in \cite{rond_sgeo_09}.
+The three component RFs for all the stations for each source are obtained by (1) estimating the source time function through Principal Component Analysis (PCA) on the $P$ components of the $P-SV-SH$ rotated seismograms, (2) removing the source waveform $\bar{P}$ from the records to obtain the estimated three component scattered wavefields $P’-SV-SH$ where $P’=P-\bar{P}$ and (3) deconvolving the estimated scattered wavefields by the estimated source wavefield in the frequency domain using a regularized least-square inversion with optimal damping parameter for each seismogram and each component (\cite{pear_jgr_12}, \cite{bost_gji_99}).
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Kirchhoff prestack depth migration}
+
+%\rq{Introduction sentence.}
+In order to exploit this three-component data, we adapt a prestack migration that allows to naturally take 3D effects into account from reflection to transmission seismology. 
+Kirchhoff prestack depth migration is a technique that was developed in exploration geophysics and that maps scattered phases observed at the surface on time series seismic records back at depth to scattering points (\cite{ylma_book_01}).
+Using a reference velocity model, the energy is propagated back in depth to all the points in 3D that would provide the same observed arrival.
+By doing so, we effectively treat each grid point as a potential scatterer and smear the energy of a given observed arrival along a migration isochron in the depth domain.
+The energy at depth for each observed trace is then stacked after migration.
+%\rq{"Alternatively, in the data space..."}
+Alternatively, in the data space that corresponds to finding the scattering points or interfaces by stacking the energy peaks along coherent diffraction hyperbolae.
+
+For two observed phases on two different waveforms corresponding to the same scattering point (i.e. to the same diffraction hyperbola), the depth-migrated isochrons will intersect at the actual scattering point and stack up constructively.
+Extending this observation to all the source-receiver couples and all the scattering points, we can see that this depth domain stacking will focus the energy from the isochrons to the actual scattering features.
+However, for this method to work correctly, a high density of data is required.
+For teleseismic data, an ideal array would have about 20 km station spacing for apertures on the order of a few hundred kilometers to correctly map lithospheric structures (\cite{rond_sgeo_09}).
+As summarized in \cite{rond_sgeo_09}, the imaging principle for the teleseismic Kirchhoff prestack depth migration can be written as:
+
+%\vspace{-10mm}
+\begin{align}
+  f(x) &= \int\!\!\!\!\int \vec{\text{w}}(x,r) \cdot \Delta\vec{\text{u}}(r,t=T(r,x)) \; dr
+  \label{gen}
+\end{align}
+\vspace{1mm}
+
+\noindent where is $f(x)$ the scattering potential at a given image point $x$ in depth, 
+$r$ describes the source-receiver geometry on the region of interest, 
+the weights $\vec{\text{w}}(x,r)$ are linked to the treatment of the wavefield’s amplitude and polarity during the migration, 
+$\Delta\vec{\text{u}}$ is the three dimensional scattered wavefield itself obtained through three component RF deconvolution as described in previous section, 
+and $T(r,x)$ represents the arrival times associated with a given source / scattering point / receiver geometry estimated in a reference 3D velocity model.
+%\rq{BEFORE (2): tp+ts-td.}
+For the forward P-to-S scattering for example we have $T(r,x) = t_P + t_S - t_d$, where $t_P$, $t_S$ and $t_d$ are travel times computed in the reference 3D velocity model for the P-wave traveling from the source to the scattering point, the S-wave traveling from the scattering point to the receiver, and the direct P-wave traveling  from the source to the receiver respectively.
+We use the fast marching method (FM3D, \cite{deko_gji_06}) to compute these travel time fields.
+The integrals are over all the sources and all the receivers.
+
+The weights $\vec{\text{w}}(x,r)$ account for the amplitude treatment of the migrated waveforms.
+They are a linear combination of the geometrical spreading, the scattering patterns and the projection of the incoming polarization vector of the scattered phase on the (R,T,Z) reference frame of the station.
+The geometrical spreading accounts for amplitude reduction due to 3D wave propagation from the scattering point to the receiver.
+The scattering patterns can be seen as simulating the physics of elastic wave propagation (e.g. amplitude of a P-to-S conversion) without having to numerically compute the full wavefield.
+%\rq{Small transition.}
+Taking those elements into account in the migration allows us to consistently retrieve a greater amount of information from the waveforms than one component migration.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Accounting for scattering theory}
+
+\cite{cheng_gji_16} showed that, in order to image dipping discontinuities for any incoming slowness and back-azimuth, the polarities and amplitudes of the RF need to be corrected by using scattering patterns.
+ For a source-station geometry $r$ and for every grid-point $x$ in our 3D space, scattering patterns describe the amplitude and polarity of the polarization vector of the wave scattered at that point $x$.
+That is, for a given angle between the incoming and scattered wave, they give the amplitude and sign of the scattered phase (see fig3).
+ We compute this value for every $r$ geometry and each point $x$ in depth.
+The projection of the estimated polarization vector from $x$ to the station on the (R,T,Z) reference frame at the station is a measure of how much a scatterer at $x$ would contribute to each component of the RF.
+Applying the dot product between this resulting vector and the observed wavefield $\Delta\vec{\text{u}}(r,t=T(r,x))$  tells us how much energy should be migrated to $x$.
+
+As suggested in \cite{tone_epsl_08}, migrating multiple component RFs improves the final image if polarities are correctly treated.
+Correcting the amplitude and polarities of the scattered waves using scattering theory allows us to consistently retrieve coherent information on all three components of the RF.
+As in other methods that use three component RFs, this gives rise to three possible situations.
+If a given grid point corresponds to an actual scatterer, we will extract coherent information on the three components of the RF.
+If the grid point corresponds to a geometry where no scattering is theoretically expected, no energy will be migrated from the RF.
+Finally, if the grid point has high potential scattering values but the three components of the RF are not coherent, i.e. there is no scattering at that point, they will interfere destructively.
+This allows us to consistently extract the coherent information of the RF. 
+We will now explicitly describe the terms that go into $\vec{\text{w}}(x,r)$. and how we modify the imaging principle to incorporate the free surface multiples.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Scattering theory}
+
+\cite{cheng_gji_16} used the scattering patterns from \cite{rond_sgeo_09}, which are 3D scattering patterns projected in 2D.
+This approximation is valid for SV scattered waves that oscillate in the plane defined by the source, the scattering point and the receiver, hereafter called the scattering plane.
+This is what happens in the case of forward P-to-S scattering.
+However, in order to be able to treat the SH scattering that appears in the free surface multiples scattering, we need to use fully 3D scattering patterns. 
+
+The derivation of the 3D scattering patterns for a single scattering point was developed by \cite{beyl_wamo_90}.
+The authors study the behavior of a plane wave propagating in a smooth velocity model that hits a scattering point.
+Extending the equations for volumetric scattering to point scattering under the single scattering Born approximation, they express the amplitude and polarization of scattered waves for incoming unit vectors.
+This defines the following scattering patterns $\varepsilon^{X_1X_2}$ for any given incident $X_1$ and departing $X_2$ seismic wave at the scattering point:
+
+%\vspace{-10mm}
+\begin{align}
+  \varepsilon^{pp} (\theta) &= \dfrac{\delta \rho}{\rho_0} 
+                               \left( 1 + \cos(\theta) + \dfrac{\beta_0}{\alpha_0} (\cos(2\theta)-1) \right) \notag
+                   \\ & \quad + 2 \dfrac{\delta \alpha}{\alpha_0} 
+                               + \dfrac{\delta \beta}{\beta_0} \left( 2 \dfrac{\beta_0^2}{\alpha_0^2} (\cos(2\theta)-1) \right)
+\\
+  \varepsilon^{ps} (\theta) &= \dfrac{\delta \rho}{\rho_0} 
+                               \left( \sin(\theta) + \dfrac{\beta_0}{\alpha_0} \sin(2\theta) \right) \notag
+                   \\ & \quad + \dfrac{\delta \beta}{\beta_0} \left( 2 \dfrac{\beta_0}{\alpha_0} \sin(2\theta) \right)
+\\
+  \varepsilon^{sp} (\theta) &= - \varepsilon^{ps}
+\\
+  \varepsilon^{s_vs_v} (\theta) &= \dfrac{\delta \rho}{\rho_0} 
+                                   \bigg( \cos(\theta) + \cos(2\theta) \bigg) \notag
+                       \\ & \quad + \dfrac{\delta \beta}{\beta_0} \bigg( 2 \cos(2\theta) \dfrac{}{} \bigg) 
+\\
+  \varepsilon^{s_hs_h} (\theta) &= \dfrac{\delta \rho}{\rho_0} 
+                                   \bigg( 1 + \cos(\theta) \dfrac{}{} \bigg)
+                                   + \dfrac{\delta \beta}{\beta_0} \bigg( 2 \cos(\theta) \dfrac{}{} \bigg)
+\end{align}
+\vspace{1mm}
+
+\noindent where $\alpha$ is the P-wave velocity, 
+$\beta$ is the S-wave velocity, 
+$\rho$ is the density, 
+subscript $\cdot_0$ corresponds to the smooth reference model, 
+$\delta$ corresponds to the local heterogeneity at the scattering point and 
+$\theta$ is the scattering angle between the incoming $X_1$ phase and the $X_2$ scattered phase in the scattering plane at the scattering point.
+%\rq{Again, Sv is [...] and Sh is [...].}
+Here we note that $S_V$ is defined locally at the scattering point and is that part of the S-wave that oscillates in the scattering plane, not in the great-circle plane.
+Conversely, $S_H$ oscillates orthogonally to the scattering plane.
+
+In this work, we obtain the scattering angle by estimating the directions of propagation of the incoming and scattered waves at the grid point.
+These directions are given by the gradient of the wavefront obtained from the Eikonal solver.
+The angle $\theta$ is then used to compute the scattering patterns, and characterize the behavior of every scattered phase.
+
+Once we obtain the scattering with the angle $\theta$ and estimate the polarization of the scattered wave, we project this vector on the (R,T,Z) reference frame at the station.
+This tells us how much energy scattered at point $x$ is expected to contribute to each component of the RF.
+The amount of energy that is migrated on each point of the isochrons is determined by comparing the recorded energy on the RF and the predicted energy from the surface projection.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Forward scattered waves and free surface back-scattered multiples}
+
+Standard RF studies interpret the phases observed in deconvolved waveforms only as forward P-to-S conversions, referred to as PS hereafter, although a well-known issue is the influence of the free surface multiples.
+Because the signal from these scattered phases stacks up coherently, they generate serious artifacts and can hinder the interpretation of features in the migrated images (\cite{cheng_grl_17}).
+However, if properly accounted for, multiple reflections can become a useful tool as they bring complementary information about the structure (\cite{tauz_epsl_16}). 
+
+The free surface multiples are the waves that reflect at the free surface of the Earth and are backscattered towards the surface by the same heterogeneities that generate the direct P-to-S scattering.
+In the case of the Born approximation, we are looking at three different multiple modes.
+The first one to arrive is reflected as a P wave at the surface, hereafter referred to as lower case p, and backscattered as a P wave.
+The second one is also reflected as a P wave but backscattered as an S wave towards the station.
+The third one is reflected as a converted S wave at the surface, hereafter refered to as lower case s, and backscattered as an S wave.
+These phases will be referred to as PpP, PpS and PsS respectively.
+Note that the S-to-S scattering for the PsS wave has as both an SV-to-SV and an SH-to-SH component.
+A visual representation of these phases is shown in the first column of fig3.
+
+In this section we show how we also account for phases reflected at the surface, i.e. PpP, PpS and PsS modes of scattering in the migration algorithm.
+Let us first write the imaging principle in the case of forward PS scattering mode.
+Since we work with a finite the number of sources $i$ and stations $j$, and use a finite number of grid points $k$, equation eq.\eqref{gen} can be rewritten in the discrete form:
+
+%\vspace{-10mm}
+\begin{align}
+  f_{ps}(k) &= \sum_i \sum_j \; \text{G}(j,k) \; \varepsilon^{ps}(i,j,k) \; \notag\\&\qquad\qquad \vec{\delta}_{ps}(j,k) \cdot \Delta\vec{\text{u}}(i,j,t_P+t_S-t_d)
+ \label{ps}
+\end{align}
+\vspace{1mm}
+
+\noindent where $f_{ps}(k)$ is the scattering potential for the forward P-to-S scattering at a given grid point $k$,
+G$(j,k)$ is amplitude correction for geometrical spreading, 
+$\varepsilon^{ps}$ is the scattering pattern for the PS mode, 
+and $\vec{\delta}_{ps}$ is a unit vector representing the polarization of the scattered S-wave.
+Finally, $t_P$, $t_S$ and $t_d$ are travel times computed in the reference 3D velocity model for the P-wave traveling from the source to the scattering point, the S-wave traveling from the scattering point to the receiver, and the direct P-wave traveling  from the source to the receiver respectively.
+We use the fast marching method (FM3D, \cite{deko_gji_06}) to compute these travel time fields.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Integration of free surface multiples}
+
+In order to incorporate the other modes of scattering in the migration and map their energy back at the correct location, we need to compute their associated travel times and amplitudes corrections.
+More precisely, we need to compute the travel times for the initial P-wave from the source to the surface, the reflected downward going P and S-waves and the back-scattered P and S-waves from all the grid points to the receivers.
+Again, we use the fast marching method to compute three travel time fields (P, Ps and Pp) for each source and two (upgoing P and S) for each receiver.
+By combining these Pp and Ps travel times with the P and S scattered wave travel times we get the travel times for all 3 first order free surface multiples. 
+
+We use the scattering patterns detailed above to get the correct amplitudes and polarities for these modes as well.
+However, in the case of the free surface multiples, the behavior of the amplitude and polarity of the phases is more complex than a single scattering pattern.
+In this case, we combine the appropriate $\varepsilon^{X_1X_2}$ scattering patterns in a phase specific complete scattering pattern $S_m$.
+The expressions for all the $S_m$ can be found hereafter and illustrated in fig3:
+
+%\vspace{-10mm}
+\begin{align}
+S_{ps}  &= \varepsilon^{ps}_{\beta} (\theta )
+\\
+S_{ppp} &= \varepsilon^{pp}_{\alpha} (\theta') \; \varepsilon^{pp}_{\alpha} (\theta)
+\\
+S_{pps} &= \varepsilon^{pp}_{\alpha} (\theta') \; \varepsilon^{ps}_{\beta} (\theta)
+\\
+S_{pss} &= \varepsilon^{ps}_{\beta} (\theta') \; \Big( (\vec{\delta'} \cdot \vec{\delta}) \; \varepsilon^{s_vs_v}_{\beta} (\theta)
+      \notag \\ & \quad + (\vec{\delta'} \cdot \vec{\gamma}) \; \varepsilon^{s_hs_h}_{\beta} (\theta) \Big)
+\end{align}
+\vspace{1mm}
+
+As opposed to the direct P-to-S scattering mode, there are two angles to consider.
+The first one is the angle $\theta'$ at the free surface reflection and that is in the great circle plane that contains the source and the scattering point.
+The second one is the angle $\theta$ at the scattering point that is in a second scattering plane defined by the free surface reflection point, the scattering point and the receiver.
+This leads to a generalized definition of the imaging principle, derived from equation eq.\eqref{ps}, for every scattering mode:
+
+%\vspace{-10mm}
+\begin{align}
+  f_{m}(k) &= \sum_i \sum_j \; \text{G}(j,k) \; \text{S}_{m}(i,j,k) \; \notag\\&\qquad\qquad \vec{\delta}_{m}(j,k) \cdot \Delta\vec{\text{u}}(i,j,T_m)
+  \label{mod}
+\end{align}
+\vspace{1mm}
+
+\noindent where $f_{m}(k)$ is the scattering potential for the scattering mode $m$ at the grid point $k$, 
+$m$ $\in [1,4]$ represents one of the four the scattering modes (either PS, PpP, PpS, PsS), 
+S$_m(i,j,k)$ is the complete scattering pattern for a given $m$ mode, 
+$\vec{\delta}_m(j,k)$ is the unit polarization vector of the scattered wave arriving at the receiver for a given $m$ mode, 
+and $T_m$ corresponds to the travel time estimated in a reference 3D model  for a given $m$ scattering mode.
+For the PpP phase this corresponds to $T_{PpP} = t_P(i,x') + t_p(x',x) + t_P(x,j) - t_d$ with $x'$ the surface reflection point and $x$ the potential scattering point.
+
+As estimating the exact direction of polarization $\vec{\delta}_m(j,k)$ of the scattered wave at the receiver represents some non-negligable extra computational cost, here we assume that the polarizations do not change from the scattering point $k$ to the receiver $j$ at the surface.
+This is equivalent to assuming straight rays in a homogeneous medium from the scattering point $k$ to the receiver $j$.
+This proved to be a good approximation for lithospheric and upper mantle experiments but may be more problematic for lower mantle studies. 
+
+In addition to that, we down-weight the contribution of grid-points that are far on the sides, not exactly below the stations.
+We affect a vertical sensitivity cone to every station to remove the long distance interactions at shallow depths and clear up the images.
+\cite{cheng_gji_16} proved that this kind of sensitivity function helps remove artifacts in the migrated images.
+However, this means that we limit our ability to image steeply dipping reflectors.
+For the PS migration, this limits the observable angles to 45$^{\circ}$, and for the free surface multiples it means that we loose sensitivity at about 30$^{\circ}$ dip.
+We use a $\cos^4$ as it has very sharp edges at 45$^{\circ}$.
+This leads to the definition of the following imaging principle:
+
+%\vspace{-10mm}
+\begin{align}
+  f_{m,foc}(k) &= \sum_i \sum_j \; \text{F}(j,k) \; \text{G}(j,k) \; \text{S}_{m}(i,j,k) \; \notag\\&\qquad\qquad \vec{\delta}_{m}(j,k) \cdot \Delta\vec{\text{u}}(i,j,T_m)
+  \label{foc}
+\end{align}
+\vspace{1mm}
+
+\noindent where $f_{m,foc}(k)$ is the focused scattering potential for the scattering mode $m$ at the grid point $k$, $F(j,k)$=$\cos^4(\nu)$ is the focusing factor and $\nu(j,k)$ is the arrival angle under the station.
+This factor however can be set to 1 if one wants full coverage of possible dip angle resolution.
+
+Using this imaging principle we get four separate images, one for each scattering mode.
+In every image, the energy migrated from the waveforms due to one of the scattering mode is back propagated at the correct depth, while the other three modes are migrated at spurious depths.
+However, the benefit of this approach is that these spurious features are migrated at different positions in each image, whereas real structure will be at coherent depths over all modes.
+This means that by extracting only the coherent information between these four images, the spurious features should mainly disappear and only let the true structure appear.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Image Stacking Techniques}
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{Linear stacking}
+
+In order to extract coherent information from multiple images modes, we explored several stacking methods.
+We have implemented three stacking techniques.
+The first is a linear stack over the four modes can be summarized in the following equation:
+
+%\vspace{-10mm}
+\begin{align}
+  f_{lin}(k) &= \sum_m \sum_i \sum_j \; \text{F}(j,k) \; \text{G}(j,k) \; \text{S}_{m}(i,j,k) \; \notag\\&\qquad\qquad \vec{\delta}_{m}(j,k) \cdot \Delta\vec{\text{u}}(i,j,T_m)
+  \label{lin}
+\end{align}
+\vspace{1mm}
+
+\noindent where $f_{lin}(k)$ is the stacked scattering potential for all 4 modes at the grid point $k$. 
+
+As stated previously, in this image the features that are coherent across all four modes will have higher amplitude.
+But since this sum is linear, we also expect the spurious features to be reduced by less than an order of magnitude if all modes have roughly the same migrated amplitude, and will thus be still visible on the final image.
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{Phase-Weighted stacking}
+
+The second one is a Phase Weighted Stack (PWS).
+In this method, we compute the instantaneous phase $\varphi(t)$ of the RF based on its analytical signal (\cite{schi_gji_97}, \cite{cost_gphy_18}).
+We then migrate and stack the complex phase $e^{i\varphi_k(x)}$ at each grid point and take the norm of the stacked complex phase as a measure of coherence of the data (\cite{coop_saga_07}).
+This can be summarized in the following general equation:
+
+%\vspace{-10mm}
+\begin{align}
+  y(x) &= \dfrac{1}{N} \sum_j^N s_j(x) \left\vert \dfrac{1}{N} \sum_k^N e^{i\varphi_k(x)} \right\vert
+  \label{pws_1}
+\end{align}
+\vspace{1mm}
+
+\noindent where the first sum represents the amplitude stack of the data $s_j$ , and the second sum is the norm of the stacked unit migrated complex phases $e^{\varphi_k}$ that acts as a filter to the amplitude stack.
+On one hand, if the signals are coherent, their instantaneous phases $\varphi_k$ will be point in the same direction and the modulus of the sum of the complex phases will be high.
+On the other hand, if the signals at a given grid point is mainly noise, then the instantaneous phases will be point towards random directions and cancel out, leading to a minimum in the stacked complex phases modulus.
+
+In our case, we need to compute the instantaneous phase of the 3D incoming signal using the estimated polarization of the scattered waves, which is different at every grid point, based on the instantaneous phase of the 3 components of the RF.
+This leads to reformulating our imaging principle as:
+
+%\vspace{-10mm}
+\begin{align}
+  f_{pws}(k) &= \text{C}(k) \; \sum_m \sum_i \sum_j \; \text{F}(j,k) \; \text{G}(j,k) \; \text{S}_{m}(i,j,k) \; \notag\\&\qquad\qquad\qquad \vec{\delta}_{m}(j,k) \cdot \Delta\vec{\text{u}}(i,j,T_m)
+  \label{pws}
+\end{align}
+\vspace{1mm}
+
+\noindent where $f_{pws}(k)$ is the Phase-Weighted stacked scattering potential for all 4 modes at the grid point $k$, and with C$(k)$ the coherence of the four modes defined as:
+
+%\vspace{-10mm}
+\begin{align}
+  \text{C}(k) &= \left\vert \sum_m \sum_i \sum_j e^{i\varphi(m,i,j,k)} \right\vert
+  \label{coh}
+\\
+  \text{and} \quad \qquad \varphi &= arg( \text{S}_m \; \vec{\delta}_m \cdot \Delta\tilde{\text{u}})
+  %\text{and} \quad \qquad \varphi(m,i,j,k) &= arg( \text{S}_m(i,j,k) \; \vec{\delta}_m(j,k) \cdot \Delta\tilde{\text{u}}(i,j))
+  \label{arg}
+\end{align}
+\vspace{1mm}
+
+\noindent where $\Delta\tilde{\text{u}}$ is the analytical signal of $\Delta\vec{\text{u}}$.
+%\rq{BEFORE (3): This is a phase coherence filter.}
+As the name implies, the Phase-Weighted stack is a phase coherence filter that we apply directly to the linear migration.
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{2\textsuperscript{nd} root stacking}
+
+Finally, we have implemented a 2\textsuperscript{nd} root stacking (\cite{schi_gji_97}).
+This is achieved by summing the square root of the amplitudes for all the traces and taking the resulting image to the power 2 after the stack.
+This is a non linear stacking method.
+The general formula for N\textsuperscript{th} root stacking can be summarized as follows:
+
+%\vspace{-10mm}
+\begin{align}
+  y(x) &= sign\big(r(x)\big) \; \vert r(x) \vert^{n}
+  \label{2nd_1}
+\\
+  \text{with} \quad r(x) &= \dfrac{1}{N} \sum_j^N sign\big(s_j(x)\big) \; \vert s_j(x) \vert^{1/n}
+  \label{2nd_2}
+\end{align}
+\vspace{1mm}
+
+\noindent where $r(x)$ is the stack of the N\textsuperscript{th} roots of the $s_j(x)$ data.
+We tried other power values for the N\textsuperscript{th} root stacking method but higher values tend to remove everything but the sharpest coherent contrasts, which can be problematic for smaller coherent scattering structures.
+
+In our case, if we call $\textsc{Amp}$ the corrected amplitude for every $(i,j,k)$ triplet and $\textsc{Stack}$ the value of the stacked square root of the amplitudes at grid point $k$, we can rewrite our imaging condition as:
+
+%\vspace{-10mm}
+\begin{align}
+  f_{2rs}(k) &= sign(\textsc{Stack}) \left\vert \sum_m \sum_i \sum_j \; sign(\textsc{Amp}) \; \right.\notag\\&\qquad\left. \Big\vert \text{F}(j,k) \; \text{G}(j,k) \tfrac{}{}\; \text{S}_{m}(i,j,k) \; \right.\notag\\&\qquad\qquad\left. \vec{\delta}_{m}(j,k) \cdot \Delta\vec{\text{u}}(i,j,T_m)\Big\vert^{1/2} \right\vert ^2
+  \label{2rs}
+\end{align}
+\vspace{1mm}
+
+\noindent where $f_{2rs}(k)$ is the 2\textsuperscript{nd} root stacked scattering potential for all 4 modes at the grid point $k$.
+%\rq{BEFORE (3): This is an amplitude coherence filter.}
+This time, as opposed to the Phase-Weighted stack, we obtain an efficient amplitude coherence filter with this definition of the 2\textsuperscript{nd} root stack.
+
+In the previous section we described the physics and the geometry of the problem with the scattering patterns and explicitly described the equations and the imaging principles we need to obtain a final single image of the subsurface.
+In the following section we use synthetic examples to show that the resulting imaging principle (eq.\eqref{foc}) is robust and that we are able to assimilate all the available data with no back-azimuth or slowness restriction.
+Then we show how the different stacking methods affect the results, and finally we apply the imaging principles to real data after discussing the computational efficiency of the method. 
+
+
+%---------
+% Section
+%---------
+\section{Synthetic tests}
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Model and setup}
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{Synthetic models}
+
+The first two synthetic models we designed correspond to typical challenging cases with dipping structures, where the amplitudes and polarities of the data strongly depend on back-azimuth and epicentral distance, and need to be corrected to be correctly interpreted.
+They are described in table1.
+The first model WCS1 is comprised of 2 layers separated by an interface with contrasts of 10$\%$ in $\alpha$, $\beta$ and $\rho$ at a 40$^{\circ}$ dip.
+It represents a worst-case scenario for polarity reversals as shown in \cite{cheng_gji_16}.
+The second model WCS2 has the same elastic contrasts and a 10$^{\circ}$ dip.
+It represents a worst-case scenario regarding the influence of the free surface multiples.
+These two synthetic cases are implemented to demonstrate the importance of accounting for scattering patterns and free surface scattering modes when migrating data.
+We also show that our scheme allows us to use all slowness and back-azimuth ranges available, and hence to increase the data coverage.
+
+The third model R2DSZ is comprised of 5 layers and represents an idealized 2D subduction zone.
+The first layer is a 30 km thick over-riding crust.
+The second one is the over-riding mantle.
+The third and fourth ones are the subducting crust and lithospheric mantle that form the subducting plate, with respective thickness of 10 and 30 km,  and dipping at a 30$^{\circ}$ angle.
+The last one is the unperturbed mantle under the subducting plate.
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{Synthetic setup}
+
+In order to demonstrate that our migration method can be applied at a continental scale, we decided to test our method on a synthetic array that spans 100 by 400 km (fig5).
+The array is comprised of 11x41 stations regularly spaced with station spacing of just above 10 km.
+The sources are regularly spaced in back azimuth and are given a random distance from the center of the array between 30 and 90 degrees to simulate arrivals from all slownesses and back azimuths.
+We acknowledge that this is an idealized geometry that rarely is available with field data as arrays usually have irregular shapes and sample an irregular distribution of back-azimuths.
+We used up to 24 sources and created a total of up to 10824 synthetic waveforms for each synthetic velocity model.
+
+For the simple worst-case scenarios, applying the successive imaging principles will help us demonstrate the strong points of our method regarding the use of three component RFs and scattering pattern corrections.
+For the realistic 2D subduction model, we expect to be able to see the over-riding and subducting crust as a clear positive peak using this setup.
+Also, we expect the method to be able to detect both the crust and the LAB in the subducting slab.
+Fig5 shows this setting for this synthetic scenario.
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{Synthetic waveforms}
+
+The synthetic data is generated with a ray-based approach for modeling teleseimic body waves in dipping structures (Raysum, \cite{fred_gji_00}).
+This algorithm computes the arrival times and amplitudes of different converted and reflected phases in a layered geometry.
+It can handle a large number of planar, homogeneous anisotropic layers with arbitrary strike and dip.
+However, the models cannot contain velocity or anisotropy gradients inside the layers and the layers themselves cannot intersect in a region where a ray passes through.
+because of the limitations of Raysum, we could not simulate a slower laterally limited mantle wedge in our idealized subduction zone model.
+These limitations mean that these are not fully 3D synthetics, so we will refer to them as 2.5D synthetics hereafter.
+
+The advantage of this algorithm is that it is accurate and computationally efficient as it uses analytical formulae to compute the travel times, amplitudes and phase of the transmitted and scattered waves.
+Raysum outputs an ensemble of diracs convolved with a Gaussian source time function with a variable standard deviation, set to 3 seconds in our case.
+We use this data directly as our “receiver functions”, as our source function is already a Gaussian.
+Our synthetic tests are performed without noise.
+
+%  -  -  -  -  -
+% Subsubsection
+%  -  -  -  -  -
+\subsubsection{Overall computational cost}
+
+The computation cube used to estimate travel times with the Eikonal solver is 6$\times$6 degrees in latitude and longitude and 500km in depth.
+The migration box is 5$\times$5 degrees by 450km depth to allow to account for potential border effects in travel-time calculations.
+The computations and migrations for all the synthetic cases were run on a single core.
+The Raysum and analytical signal computation take a couple minutes.
+Running FM3D for 24 sources and 451 receivers takes three hours with a voxel size of 5$\times$5$\times$5km on average.
+The migration of the 10824 RF with the multi-mode algorithm also takes three hours.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Imaging potential of scattering patterns and 3 Component migration}
+
+As shown in \cite{cheng_gji_16}, the scattering patterns are important not only to retrieve relative amplitude between the various phases but also to account for correct polarities on dipping reflectors.
+This section corresponds to the synthetic case described as WCS1 in table1, with a single 40$^{\circ}$ dipping interface.
+Results are shown in fig6 and fig7.
+Fig6 shows the results of the migration for the PS mode of two sources coming from opposite sides of the structure, both in the imaging plane.
+The first source (left column) comes from \hl{down-dip}, which is right in this geometry, and the second source (middle column) comes from \hl{up-dip}, which is left in this geometry.
+Fig7 shows the results for two sources that were rotated 90$^{\circ}$.
+The first source (left column) comes from the reader's perspective into the figure and the second source (middle column) comes from the other direction, facing the reader.
+Our method allows us to take advantage of a fully 3D source-receiver geometry by implementing the scattering patterns and migrating the three components of the RF.
+We illustrate our method with single-source migrations.
+Table2 describes which part of the imaging principle is taken into account in every figure.
+%\rq{IT IS NICE TO REFER TO TABLE 1 AND 2. BUT YOU SHOULD ALSO EXPLICITLY SAY WHAT IS THE TEST HERE. QUICKLY RECALL THE MODEL, THE SETUP, AND THE TYPE OF MIGRATION USED FOR FIGURES 6 AND 7.}
+
+In Fig 6 we migrate the radial component of the PS mode in the simple 2D model WCS1 with a dipping interface at 40$^{\circ}$ to show the effect of applying the scattering pattern corrections for phases coming from both \hl{up-dip} and \hl{down-dip} sources.
+Fig6a to 6c (top row) are migrated without taking the scattering patterns into account.
+On fig6a (\hl{down-dip} source, first column) the migration algorithm focuses most of the energy on the discontinuity (black line).
+However, the free surface back-scattered phases are also migrated and depict spurious structures with higher dip values and alternating signs.
+A lot of energy has been smeared in the migrated image and is visible above the discontinuity.
+Fig6b shows that for a \hl{up-dip} source (second column) we also focus the energy on the discontinuity at the correct depths but the polarity reversal has not been accounted for and the sign of the migrated scattering potential is negative.
+Notice also that this image contains less energy from the multiples as this particular geometry generates less scattering overall on the radial component of the RF as the rays arrive almost orthogonally to the discontinuity (cf fig3).
+Fig6c shows that the image generated by linearly stacking both sources (third column) is largely dominated by the \hl{down-dip} source energy and that the two sources interfere destructively where they are supposed to stack up.
+
+If we now apply the amplitude and polarity corrections given by scattering patterns and redo the same migration, we can see on fig6d and fig6e (bottom row) that the sign of the scattering potential of the imaged structures are now coherent for the two sources.
+We also note that even the \hl{down-dip} source image is significantly clearer as the positive and negative parts of the scattering pattern correction ellipse globally cancel out far away from the scattering interface.
+%This time fig6e shows even less artifacts as the scattering from the multiples is less coherent.
+Fig6f shows that, even if the sum over the two sources is still dominated by the \hl{down-dip} source, this time the two images interfere coherently where they are expected to.
+We migrate the correct polarities each time and the images stack constructively.
+We eliminate the polarity problem for large dip angles and can automatically assimilate data from all slownesses.
+
+Fig7 shows the benefit of migrating the 3 components of the RF for large dips for \hl{side-dip}, transverse arrivals in the WCS1 scenario.
+We show that there is a lot of complementary information to be gained from 3 components migration, given that polarity reversals are properly accounted for.
+Similarly to fig6, we migrate the PS mode for a simple 2D model with an interface dipping at 40$^{\circ}$.
+
+Fig7a to 7c (top row) show the migrated images of the radial component for two sources placed symmetrically on one side (first column) and the other (second column) of the dipping structure.
+It shows identical images for the two sources which is expected.
+The signs of the discontinuities are correct in both images for the PS mode but we also see a lot of energy from the PpS and PsS multiples at higher dip angles.
+The summed image (third column) in fig7c shows the same attributes.
+However, the maximum absolute amplitude in this image is lower than in fig6a.
+When migrating the transverse and vertical components of the RF in fig7d and 7e (middle row), the maximum amplitude is higher but we have polarity issues.
+Moreover, the images are not identical anymore because the transverse component is defined in opposed directions for both sources.
+Therefore we can see in fig7f that the stack of the two previous images does not give a satisfactory result, as we image mostly artifacts.
+By applying the scattering patterns on the three components, we solve the problem in fig7g to 7i (bottom row).
+This time, by migrating the three components of the RF with their respective scattering weights, we find identical images again, which is what we expect after the correction, and the amplitude in the stacked images are on the same order of magnitude as their counterparts in fig6.
+Integrating the three components of the RF into the imaging principle allows us to coherently retrieve the information about scattering for arbitrarily dipping discontinuities from all back-azimuths.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Multi-mode migration}
+
+As seen in fig6 and fig7, free surface multiples are present yet easily distinguishable in the PS migrated image.
+Since multiples tend to be stronger and more difficult to interpret correctly in sub-horizontal settings, we choose a model with a 10$^{\circ}$ dipping interface, and thus placed ourselves in a worst case scenario (\cite{cheng_grl_17}).
+This time we use 24 sources to cover all possible back-azimuth and incidence angles.
+Fig8 shows the migrations for the 4 modes for the scenario WCS2 described in table1, which has one interface at a 10$^{\circ}$ dip.
+
+Fig8a shows the image for the PS migration with the three components.
+The black line shows the only feature that is present in the synthetic model.
+We can see a coherent signal that lines up with it, but also a large negative feature at approximately 150km depth that corresponds to the PpP multiple, a small positive feature at 400km depth and 5$^{\circ}$ distance that corresponds to the PpS multiple and a strong negative feature just under it between 300km and 400km depth that corresponds to the PsS multiple.
+
+We perform the 3 migrations for the free surface multiples that can be seen on fig8b (PpP), fig8c (PpS) and fig8d (PsS).
+The free surface multiples in the synthetic waveforms are correctly migrated in their respective images.
+However, in each image, three out of four modes are wrongly migrated. 
+They appear at different depths, and depict structures with different dip angles.
+More precisely, phases slower than the currently migrated mode are placed below the true scattering feature (e.g. in fig8a), and phases faster than the currently migrated mode are placed above the scattering feature (e.g. in fig8d).
+On these four migrated images, there is overall more spurious features than true features, but their locations are not coherent across the four migrations.
+In this way, these four images allow us to visually discriminate between real (coherent) and spurious (incoherent) features.
+
+Because the time delays are more compressed in the multiple modes, they have a higher spatial resolution than the direct PS conversion mode, especially for the S scattered waves (\cite{rond_sgeo_09}).
+This is due to the fact that a ray covers a single unit distance (upgoing) between two consecutive points in depth for the PS mode and two (downgoing and upgoing) when we migrate a multiple.
+%\rq{More information.}
+However, because the P-wave inherently has a frequency that is half that of the corresponding S wave, the effect discussed before is balanced for the PpP multiple (\cite{rond_sgeo_09}).
+
+We migrate the free surface multiples at their correct polarities and positions in depths using the scattering patterns and their respective travel times computed with FM3D.
+These waves have a higher resolution power and provide complementary images to the PS migration.
+Every scattering mode produces slightly different images that can be used together to improve imaging quality.
+We can mitigate the effect of spurious energy in the PS migration by migrating it together with the other modes, where the spurious energy focuses on different isochrons.
+Because the actual features are always focused at the same depth, it will sum up positively during the multi-mode migration.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Stacking methods}
+
+To extract the coherent signals in the four images previously shown, we implemented three different stacking methods in fig9.
+%\rq{More explanations.}
+As detailed before, we first perform a linear stack of all migrated modes before applying either a phase filter using the Phase-Weighted stack from eq.\eqref{pws} or an amplitude filter using the 2\textsuperscript{nd} root stack from eq.\eqref{2rs}.
+
+The first one is a linear stack (eq.\eqref{foc}, fig9a), where we simply add the energy of the four modes during the migration with no extra measure of coherence.
+The dipping interface is more focused than on fig8a.
+We note that the energy from spurious features is drastically reduced, but that they do not completely disappear.
+Three spurious streaks are still present just under the actual discontinuity.
+The thickest one corresponds to the PpP mode migrated in the PS image.
+The two thinner ones correspond to the PpS mode migrated in the PpP image and to the PsS mode migrated in the PpS image.
+We also see that there is more noise above the discontinuity than in fig8a.
+Finally, we note the negative streak at the bottom of the image, corresponding to the PsS mode migrated in the PS image.
+It does not disappear in the linear stack, because the amplitude in other images is zero there.
+This means that, on one hand, if a given mode is predominant in the record, then its contribution will also dominate the final image.
+On the other hand, if the four modes have comparable amplitudes, spurious features will be reduced to about one fourth of their amplitude on a given scattering mode migration.
+
+Fig9b shows the result for the Phase-Weighted stack and corresponds to the imaging principle in eq.\eqref{pws}.
+The resulting image exhibits fewer artifacts than with the linear stack, as most spurious signals do not have a coherent phase over the 4 modes.
+The phase stack virtually acts as a filter applied to the linear amplitude stack, as the artifacts are at the same position in depth but their amplitude is strongly reduced.
+It also focuses the energy on the scattering discontinuity even more, and the borders of the discontinuity are thinner.
+
+Finally, fig9c shows the result of 2nd root stacking and corresponds to the imaging principle in eq.\eqref{2rs}.
+The resulting image has almost all the artifacts removed and the last remaining spurious signal, the PsS from the PS migration, is reduced by an order of magnitude.
+The focus of the positive peak on the scattering discontinuity is the same as for the Phase-Weighted stack in fig9b.
+
+We have shown that most artifacts can be eliminated by applying coherence filters based either on phase (Phase-Weighted stack) or amplitude (2\textsuperscript{nd} root stack).
+We are now going to test these methods with a more complex synthetic model depicting an idealized subduction zone.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{2.5D subduction zone}
+
+Here we show how our imaging principle can be used to improve interpretations in realistic settings.
+We designed a synthetic subduction zone, described as R2DSZ in table1, and analyse the migrated images obtained using eqs.\eqref{mod}, \eqref{foc}, \eqref{pws} and \eqref{2rs}.
+%\rq{More information.}
+In this case,we have 5 different layers with constant elastic properties and use a total of 24 sources equaly spaced in back-azimuth with random epicentral distance to the center of the array of 30 to 90$^{\circ}$.
+
+Fig10a to 10d show the 4 single mode migrations.
+Fig10a is the forward scattering PS mode migration.
+It is able to resolve the Moho and the different dipping interfaces that constitute the oceanic lithosphere, but there are strong artifacts in the migrated image.
+In the right part of the image, it shows that for a simple 30 km deep Moho model, the free surface multiples can become predominant at around 100 km where one could interpret a spurious LAB.
+Fig10b shows the back-scattered PpP migration.
+The structure comes out more clearly because the PpP scattering mode is well isolated from the other phases as it oscillates mostly on the vertical component, whereas the S-waves from the other scattering modes oscillate mostly on the horizontal components.
+Fig10c shows the PpS migration.
+The higher resolution of the backscattered S modes are visible on this figure already, but as the streaks close to the Moho are very close to another, it is difficult to interpret structure on its own.
+Fig10d shows the PsS migration and exhibits both clear artifacts in the over-riding mantle wedge, that correspond to the spurious migration of the other three phases for the slab conversions, as well as clearly defined structure for the Moho and the subducting slab.
+Overall, the images for free surface multiples’ migrations have less imaging power in the lower part of the image because phases reflected on the top of dipping interfaces at these depth are not recorded on the array and leave the imaged region.
+The considered scattering modes are always migrated at the correct position in their respective images while the other modes are migrated at different locations. 
+
+Fig10e to 10g show the images obtained with the three stacking methods.
+Fig10e corresponds to the linear stack and is a strong improvement over fig10a, even if phases reflected at the continental Moho and migrated as P-to-S transmissions are still visible because the PS mode is dominating the final image.
+We also note that the image is more focused at the actual scattering interfaces and that the free surface multiples for the dipping interfaces are not misplaced anymore.
+Fig10f corresponds to the Phase-Weighted stack that focuses the energy even more at the true location of discontinuities, especially in the upper part of the subducting slab.
+There are still some visible artifacts but their amplitude is now one order of magnitude bellow the amplitude associated with the correctly migrated interfaces.
+Finally fig10g corresponds to the 2\textsuperscript{nd} root stack.
+In this image, artifacts are no more visible.
+However, the signal from the Moho and the contact between the bottom of the slab and the oceanic asthenosphere have become smaller because they stack up less than the slab.
+The slab itself is recovered down to 200 km.
+This proves that it is necessary to have a multi-mode approach in order to not misinterpret Moho free surface multiples as an LAB.
+
+Here we show that the structure of an idealized subduction zone can be retrieved using our imaging principles.
+The data can be automatically processed with the scattering patterns on three components.
+This ensures maximum data coverage and allows for good focusing of the migrated energy along the scattering interfaces.
+Now that we have shown how this works in detail on synthetic examples, we apply the imaging principles to field data from the MEDUSA array in the Hellenic subduction zone and show that we are able to retrieve the subsurface structure with fine details and find potential coherent seismic evidence for partial melting under Sousaki volcano.
+
+%---------
+% Section
+%---------
+\section{Application to field data and discussion}
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Hellenic field data}
+
+The Hellenic subduction zone provides a rare laboratory in Europe to understand the complex mechanisms that rule oceanic and continental subduction.
+The two types of subductions coexist is the Western part of the region and the link between the two systems has only partially been explained so far.
+Previous studies have shown that the convergence rates and slab retreat behavior strongly depend on the slab composition (\cite{papa_tecto_07}).
+The slab composition and water content also influence the hydration of the mantle wedge and the volcanic activity in the region, which have been studied structurally and geochemically (\cite{pepi_gsa_07}).
+Complementary geophysical methods such as long period magnetotellurics have found potential fluid pathways, emerging both from the upper part of the slab and deeper portions of the subduction (\cite{gala_tphy_05}).
+
+The data that we use in this paper comes from the Multidisciplinary Experiments for Dynamic Understanding of Subduction under the Aegean Sea (MEDUSA) project under the Western Hellenic Subduction Zone (WHSZ, \cite{pear_jgr_12}).
+From this experiment we take the data from the South Line (SL) to test our imaging principle.
+%\rq{More information.}
+The data along this line is of higher quality and the images display clearer features so it is more appropriate to benchmark our migrations.
+The station distribution is shown in fig12a.
+The direct and scattered wavefields are estimated using a multichannel approach on the three dimensional P-wave as described in section 2.
+The dataset is composed of 52 events recorded at 35 temporary stations over the course of one year, with a total of about 1500 waveforms available.
+The maximum frequency of the data is 0.5hz.
+
+The data is selected based on single-event migrations.
+We analyze the 52 noisy images and reject data in two cases.
+First, when the image displays only horizontal streaks with a single main frequency.
+In the data space, this corresponds to traces dominated by unwanted oscillations, most likely linked to the deconvolution.
+Second, when the image is dominated by southwards dipping discontinuities, as it is the opposite behaviour to what we are actually imaging (northwards dipping subduction).
+We selected 32 high-quality events for the final migration.
+%\rq{More information.}
+
+In their paper, \cite{pear_jgr_12} migrated the data using a GRT method (\cite{bost_jgr_01}) that shares some similarities with our method but is limited to a 2D approach.
+Their multi-mode image shows a clear Moho slowly dipping south-westwards from 30 to 40km.
+It also shows clear signals both from the upper and lower limits of the subducting slab dipping north-eastwards at 17$^{\circ}$ down to about 100km.
+In order to be able to better compare our 3D images to previously published 2D results, we alter the original station distribution by projecting their location on the migration line used by (\cite{pear_jgr_12}).
+%\rq{same as GRT.}
+Note that there is an equivalent step in the GRT preprocessing.
+
+A subset of data for a single event, filtered at 0.1Hz, can be found on fig12b and interpreted on fig12c.
+We see the Moho and its free-surface multiples in the north-eastern (stations 28 to 35) part on the radial and transverse components at around 3 to 15 seconds delay.
+The P-to-S convertions at the slab are visible at 5 to 10 seconds delay on the radial component and strong signals for multiples on the vertical component are visible at 10 to 30 seconds delay on stations 2 to 26.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Resolution test}
+
+In order to determine how well our method is able to image a subduction zone given the geometry of the experiment, we first perform a synthetic resolution test on a 2D model.
+We use all 52 events and 35 stations from the MEDUSA South Line experiment in this migration.
+It shows the maximum resolution we can get given the data coverage, maximum frequency and station distribution.
+In order to be able to better compare our image with GRT or RTM migrations, we project the data on the imaging line as stated previously.
+The data is generated with the Raysum code, and has a main frequency of 0.3Hz.
+%\rq{WE NEED TO DISCUSS WHAT IS NEEDED IN TERMS OF SAMPLING, THE RELATION BETWEEN STATION SPACING / FREQUENCY BAND / LEVEL OF SPATIAL RESOLUTION / RESOLVED DEPTH RANGE + multi frequency-band data} 
+This corresponds to wavelengths of down to a few km, so for the resolution test and the real data we use a 2$\times$2$\times$2km voxel size.
+Because the back-scattered S-wave multiples have smaller wavelengths in the model space, we allow for different frequencies to be used in the different modes during the migration.
+%However we keep the same frequency range for all the data in the resolution test.
+With an average station spacing of just under 10km, a 30km deep Moho should be easy to retrieve.
+This test will give us the best image possible for this setup, given the frequency band, as it is free of noise and contains only Gaussian peaks. 
+
+We design a three layer reference model described in table1 as MRT.
+The first one is the 40km thick overriding crust, then there is a 10\% velocity increase at the Moho and another 10\% velocity increase at the slab interface.
+Since the amplitude of the velocity jump is similar for the two interfaces, we expect the two interfaces to show the same scattering potential on the final image.
+
+Results for this synthetic resolution tests with constant frequency range for all modes are shown in fig11.
+Fig11a shows the result for the fully 3D imaging principle in eq.\eqref{foc} without projection on the migration line.
+The energy focuses on the discontinuities but there is some noise above and just under the Moho with both positive and negative energy values.
+There are also some artifacts under the subducted slab.
+The features are retrieved at their correct positions but there are along-dip heterogeneities introduced by the uneven spatial distribution of stations.
+More specifically, we see along the imaged Moho that there are two regions with higher sensitivity that correspond to the higher density in station coverage.
+In order to account for that effect, we individually down-weight the stations that are closer together in an effort to normalize the energy content across the image.
+
+Fig11b shows the result for the linear multi-mode stack with the array projected on the migration line and with individual station weights.
+The energy is more focused and there are less along-dip variations.
+There are still some remaining artifacts, especially around the Moho.
+Fig11c shows the result for the Phase-Weighted stack from eq.\eqref{pws} with station weights and the projection.
+There are less artifacts around the Moho but the spurious streak under the slab persists.
+Also we note that the edges of the imaged discontinuities do not go as far as in fig11b and that the energy is better focused.
+Fig11d shows the result for the 2\textsuperscript{nd} root stacking with the individual station weights and the projection.
+There are practically no artifacts left around both the Moho and the slab.
+The energy is the most focused of all four images, the edges are smaller than previously and the two features now appear to be disconnected. 
+Using synthetic tests, we show how we can expect to retrieve both the flat and the dipping discontinuities.
+We are now confident that we can recover the structure properly in the field data.
+%\rq{More or merge with previous paragraph.}
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Images and interpretation}
+
+The migrated sections are presented in fig12.
+Because of the difference in resolution power between the four modes, we use different frequency bands in the data in order to maximize the coherence on the final images.
+We filter the data between 0.03Hz and 0.5Hz for the PS and PpP data and between 0.03Hz and 0.3Hz for the PpS and PsS data.
+We down-weight the stations that are closer together to homogenize the energy content on the cross-section.
+The background velocity model for the migration is the same 1D model as the one used by \cite{pear_jgr_12} and is described in table1 as MPKDM.
+
+The images are presented in fig12d to 12g and are overall comparable to previous results by e.g. \cite{pear_jgr_12}.
+The main features that are visible are a 25 km (NE) to 35 km (SW) deep Moho and a 12km thick, 18$^{\circ}$ north-eastwards dipping slab.
+We loose the Moho signal close to the slab interface and lose the slab signal at 85km for the upper limit and 100km for the lower limit.
+Some coherent low velocity signals are visible in the mantle wedge.
+These two negative patches under the Moho at 35 and 55km are located above the part where we lose the slab signal and close to the Sousaki volcano.
+
+Looking at the images individually, let us first analyze fig12d which shows the raw fully 3D geometry linear multi-mode stack, similar to fig11a.
+Here the Moho and the dipping slab are visible but the image is noisy.
+There is no clear signal associated with the mantle wedge.
+%The depths and dips are coherent with \cite{pear_jgr_12} which is encouraging for the future fully 3D migrations.
+Fig12e shows the result for the linear stack once the data has been projected on the migration line and the individual station weights applied (similar to fig11b).
+This time the Moho appears clearly as a linear feature and much of the noise has disappeared.
+The slab signature is also more linear with a constant thickness.
+Some structures appear in the mantle wedge at 35km and 55km above the region where we lose the slab signal.
+Fig12f and 12g show the results for the Phase-Weighted stack and 2\textsuperscript{nd} root stack respectively.
+Colors have been saturated to emphasize the coherent structure.
+The two images are very similar.
+The Moho is separated in two larger patches with smaller scattering intensity in between.
+The bottom and top of the slab are clearly isolated from their surroundings and there is less noise under the slab.
+%
+%The images we obtained with our imaging principles are similar to the ones obtained with the GRT by e.g. \cite{pear_jgr_12}.
+%The Moho has the same sub-horizontal trend, plunging slightly towards the trench.
+%We find the same depth, dip and extent for the slab as that previous study.
+We lose the signal probably due to eclogitization as explained by the authors.
+We acknowledge that we cannot interpret amplitudes in our images in terms of velocity contrast $\delta \beta / \beta$ but we find that the three main discontinuities, namely the bottom of the slab, the slab Moho and the continental Moho, have approximately the same scattering potential in our image, which roughly translates into the same $\delta \beta$.
+
+The two main differences between the image obtained by \cite{pear_jgr_12} is that (1) we do not recover the same variation in thickness at 40km depth, and (2) our image presents two negative patches under the Moho.
+They could correspond to partial melting or magma accumulation areas.
+This has been inferred in similar settings such as the Cascadia Subduction Zone using magnetotelluric (MT) methods by e.g. \cite{wann_ggg_14}.
+It is inferred to be due to dehydration of the slab occurring during the gabbro-to-eclogite transition in the deeper part of the slab.
+It could appear and stagnate here because of the thermal state of the mantle wedge: the subducting slab being colder than the surrounding mantle material, analytical studies predict a local maximum in temperature in the lower part of the mantle wedge, approximately where we see the deepest negative patch (\cite{mcga_nat_14}).
+\cite{gala_tphy_05} found that there could be fluid pathways from the subducting upper mantle that arrive under the Sousaki volcano where we see these two patches.
+
+%In terms of computational efficiency, our imaging method takes 2 hours to sequentially run the time calculations with FM3D and then back propagate the data in 3D with a voxel size of 2x2x2km.
+%That’s the same order of magnitude as 2D GRT migration for the same region and the same resolution.
+
+% - - - - - -
+% Subsection
+% - - - - - -
+\subsection{Discussion}
+
+In this paper, we presented our fully 3D migration method, and illustrated it with synthetic examples.
+The application to field data proposed here however consists of a 1D array and a 2D slice.
+Therefore this does not showcase the benefit of our method, which is the fully 3D approach.
+However, there are two encouraging points that validate our method as a powerful tool to study the Earth’s interior.
+First, we show that when performing the same processing to the data than 2D GRT we get a similar image with our fully 3D imaging principle.
+This shows that our method is {\textit{a minima}} as powerful as the GRT migration to portray the underlying structure of subduction zones.
+Also, we show in fig11a and fig12d that by using the original station distribution, which deviates slightly from a 1D array, we can still recover the main features observed by authors of previous studies in the region.
+This shows that our imaging method will most likely also provide good imaging power in a fully 3D scenario.
+
+In order to benchmark our method, we first conduct a series of synthetic tests in challenging scenarios and retrieve structure acurately.
+Then we compare our images to the ones obtained in \cite{pear_jgr_12} and see that they are very similar.
+These tests in 2D and 3D settings give us confidence in that our method will be able to recover fine structure in more complex settings, particularly with 2D regional arrays such as USArray.
+
+So far the test on 2D geometries shows that our method works as well as others scheme that were specifically designed for this case.
+However our method is fully 3D and this means that we can take advantage of much more than those methods.
+Future work includes testing our method in fully 3D geometries, using fully 3D synthetics.
+We also note that we could compare our methods to those of \cite{pavl_cg_11} and \cite{hans_ggg_17}, the latter being especially close to ours.
+
+%---------
+% Section
+%---------
+\section{Conclusions}
+
+In this study, we designed a new method to interpret Receiver Functions and recover the 3 dimensional distribution of scattering structure in the Earth.
+In order to overcome the drawbacks of both fast CCP methods (that rely on the assumption that the underlying discontinuities are horizontal), and complex Reverse-Time Migration and Generalized Radon Transform migrations (that are computationally expensive), we designed a new computationally efficient fully 3D multi-mode Kirchhoff migration that does not need full wavefield calculations.
+
+We adapted the Kirchhoff method from reflection to transmission scattering and applied it to passive seismology.
+We expanded the work done by \cite{cheng_gji_16} to include 3 components and free surface multiples into an efficient multi-mode migration by computing the travel times for all scattered phases using the FM3D software.
+We use three component RFs, 3D scattering patterns and coherence filters to extract the information from the fully 3D data.
+We explicitly describe the imaging principles that we use in our migrations.
+
+These imaging principles are tested in challenging and realistic synthetic cases, using the Raysum package.
+They recover scattering structures with minimal artifacts in all tested cases, and allow to take lateral heterogeneities into account with reasonable computational time.
+Our method has a similar cost to 2D GRT.
+
+Using data from the MEDUSA experiment in the Hellenic subduction zone, we show that our method performs correctly on field data as well.
+The images we obtain are similar to the ones obtained with a 2D GRT migration and serve as a benchmark for our imaging method.
+Moreover, it reveals details about the presence of low velocity layers under the European continental Moho and in the mantle wedge that can be associated with partial melting and fluid pathways revealed in magnetotelluric studies.
+
+This method will prove useful in complex settings where lateral variations play a large role and has the potential to help seismically highlight observables from other fields such as fluid pathways in magnetotellurics.
+
+%---------
+% Section
+%---------
+\section*{Acknowledgements}
+
+We want to thank Jean Virieux and Benoit Tauzin for helpful discussion about the methodological developements and Hellenic Subduction Zone image interpretation respectively.
+This work was funded by the European Union’s Horizon 2020 research and innovation programme under Grant Agreement No. 716542.
+
+\selectlanguage{english}
+\bibliographystyle{agsm}
+%\bibliographystyle{plain}
+\bibliography{Biblio_article1.bib}
+
+%\end{multicols}
+\end{document}
